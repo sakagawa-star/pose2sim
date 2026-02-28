@@ -785,8 +785,36 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
         img = cv2.imread(str(img_path))
         objpoints = [pts.astype(np.float32) for pts in objpoints]
         imgpoints = [pts.astype(np.float32) for pts in imgpoints]
-        ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
+        ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1],
                                     None, None, flags=cv2.CALIB_USE_LU)# k3 enabled for better distortion modeling
+
+        # --- Image quality filtering ---
+        per_image_errors = []
+        for j in range(len(objpoints)):
+            projected, _ = cv2.projectPoints(objpoints[j], rvecs[j], tvecs[j], mtx, dist)
+            error = np.sqrt(np.mean(np.linalg.norm(
+                imgpoints[j] - projected.squeeze(), axis=1)**2))
+            per_image_errors.append(error)
+        per_image_errors = np.array(per_image_errors)
+
+        error_threshold = np.mean(per_image_errors) + 2 * np.std(per_image_errors)
+        good_indices = np.where(per_image_errors <= error_threshold)[0]
+        n_excluded = len(objpoints) - len(good_indices)
+
+        if n_excluded > 0 and len(good_indices) >= 10:
+            logging.info(f'    Excluded {n_excluded}/{len(objpoints)} images '
+                         f'with reprojection error > {error_threshold:.2f} px '
+                         f'(mean {np.mean(per_image_errors):.2f} + '
+                         f'2*std {np.std(per_image_errors):.2f})')
+            objpoints_filt = [objpoints[j] for j in good_indices]
+            imgpoints_filt = [imgpoints[j] for j in good_indices]
+            ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
+                objpoints_filt, imgpoints_filt, img.shape[1::-1],
+                None, None, flags=cv2.CALIB_USE_LU)
+            logging.info(f'    Recalibrated with {len(good_indices)} images: '
+                         f'error {ret_cam:.3f} px')
+        # --- End image quality filtering ---
+
         h, w = [np.float32(i) for i in img.shape[:-1]]
         ret.append(ret_cam)
         C.append(cam)
