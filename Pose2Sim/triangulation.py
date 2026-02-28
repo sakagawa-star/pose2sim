@@ -928,7 +928,7 @@ def triangulate_all(config_dict):
         # Create TRC file
         trc_paths.append(make_trc(config_dict, Q_tot[n], keypoints_names, id_person=n))
         if make_c3d:
-            c3d_paths.append(convert_to_c3d(t) for t in trc_paths)
+            c3d_paths.append(convert_to_c3d(trc_paths[-1]))
 
         # IDs of excluded cameras
         frame_count = len(Q_tot[n])

@@ -6,11 +6,14 @@ logs.txt*
 *.egg-info/
 dist/
 **/*.avi
-# **/*.mp4
+**/*.mp4
 **/*.trc
 **/*.sto
 **/*.c3d
 **/*.json
+**/*.jpg
+**/*.png
+**/*.csv
 
 **/Calib_qualisys.toml
 **/pose-3d/
@@ -18,3 +21,6 @@ dist/
 **/pose-sync/
 **/pose-associated/
 **/kinematics/
+
+# 実験データディレクトリ（Pose2Sim/20YYMMDD*）
+Pose2Sim/20*/
