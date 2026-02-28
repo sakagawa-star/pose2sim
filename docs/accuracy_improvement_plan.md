@@ -11,8 +11,8 @@ Pose2Simによる3D三角測量結果の精度を向上させるための改善�
 |---------|---------|---------|------|--------|------|
 | 000 | 設定検証 | Config.toml の正当性レビュー | **完了（検証済み）** | 最高 | [000_config_validation](000_config_validation/) |
 | 001 | 設定修正 | handle_LR_swap を無効化 | 完了 | - | [001_disable_LR_swap](001_disable_LR_swap/) |
-| 002 | キャリブレーション | intrinsicsキャリブレーションの改善 | **調査完了・実施待ち** | 高 | [002_improve_intrinsics_calibration](002_improve_intrinsics_calibration/) |
-| 003 | 設定調整 | undistort_points の再評価 | 未着手（002依存） | 高 | [003_reevaluate_undistort_points](003_reevaluate_undistort_points/) |
+| 002 | キャリブレーション | intrinsicsキャリブレーションの改善 | **案A完了（部分的成功）** | 高 | [002_improve_intrinsics_calibration](002_improve_intrinsics_calibration/) |
+| 003 | 設定調整 | undistort_points の再評価 | **002結果により完了（undistort=true推奨）** | 高 | [003_reevaluate_undistort_points](003_reevaluate_undistort_points/) |
 | 004 | 設定調整 | likelihood_threshold の最適化 | 未着手 | 中 | [004_optimize_likelihood_threshold](004_optimize_likelihood_threshold/) |
 | 005 | 設定調整 | min_cameras_for_triangulation の最適化 | 未着手 | 中 | [005_optimize_min_cameras](005_optimize_min_cameras/) |
 | 006 | 設定調整 | reproj_error_threshold の最適化 | 未着手 | 中 | [006_optimize_reproj_error_threshold](006_optimize_reproj_error_threshold/) |
@@ -40,3 +40,6 @@ Pose2Simによる3D三角測量結果の精度を向上させるための改善�
 | 2026-02-28 | 009の調査・計画完了。trc_evaluate.py（4指標: 骨長CV/滑らかさ/欠損率/左右対称性）の実装設計を確定。実装待ち |
 | 2026-02-28 | 009実装完了。trc_evaluate.py新規作成、pyproject.tomlにエントリーポイント追加。単体/比較/LSTM拡張TRC全テストパス。ベースライン計測済み |
 | 2026-02-28 | 002コード調査完了。バグなし、設計上の制約3点を特定: (1)歪みモデル4パラメータ制限(CALIB_FIX_K3)、(2)alpha=1問題、(3)画像品質フィルタなし。改善案A-D策定済み |
+| 2026-02-28 | 002の案A（k3解放）の実施手順を策定済み。次のセッションで実施開始 |
+| 2026-02-28 | 002案A実施完了。k3解放→再キャリブレーション→三角測量2パターン(undist=off/on)実施。undist=onでTRC品質改善(BoneCV:18→16.4%, Smooth:-26%, L-R Diff:6.3→4.9%)。ただし再投影誤差・カメラ除外率は改善せず。undistort=true推奨、003も事実上完了 |
+| 2026-02-28 | 002案B（alpha値調整）の実施手順を策定。common.py + reproj_from_trc_calib.pyのalpha=1→0変更。再キャリブレーション不要。次のセッションで実施開始 |

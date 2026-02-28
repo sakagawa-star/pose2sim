@@ -164,13 +164,22 @@ export MAMBA_EXE='/home/sakagawa/.micromamba/bin/micromamba' && export MAMBA_ROO
 
 **対策**: `Config.toml` で `handle_LR_swap = false` に設定。修正後は全フレームでL/R重なり0件、急反転も0件。
 
-### undistort_points=true で精度悪化する問題
+### undistort_points=true での再投影誤差増加（002で部分改善済み）
 
-**症状**: `undistort_points = true` にすると再投影誤差が増加（9.9px→11.4px）、カメラ除外率が倍増（0.47→0.96台）。特にcam01/cam03（高歪みカメラ）の除外率が36-37%に。
+**症状**: `undistort_points = true` にすると再投影誤差が増加（9.9px→11.4px）、カメラ除外率が倍増（0.48→0.96台）。cam01/cam03の除外率が35-38%に。
 
-**原因**: キャリブレーション（intrinsics）の歪み係数精度が不十分な可能性。cam01のk1=-0.146、cam03のk1=-0.150と大きい歪みがあるが、補正が正確でないと逆効果。
+**原因**: cam01/cam03の望遠レンズの歪みモデル精度が不十分。
 
-**現状の対策**: `undistort_points = false` のまま使用。根本対策にはintrinsicsキャリブレーションの改善が必要。
+**002で実施した対策**: `CALIB_FIX_K3` を除去してk3パラメータを解放→5パラメータモデルで再キャリブレーション。
+
+**結果**: 再投影誤差・カメラ除外率は改善しなかったが、**TRC品質は全指標で改善**:
+- Bone CV: 18.0% → 16.4%
+- Smoothness: 0.0189 → 0.0139 (-26%)
+- L-R Diff: 6.3% → 4.9%
+
+**現在の推奨**: `undistort_points = true` を使用。カメラ除外が増えても残ったカメラでの三角測量の質が向上するため。
+
+**次のアクション**: 案B（alpha値調整）でcam01/cam03の除外率低減を狙う。詳細は `docs/002_improve_intrinsics_calibration/README.md` セクション8。
 
 ### カメラ構成メモ（20251127-dgtw-lab2）
 
@@ -184,7 +193,7 @@ export MAMBA_EXE='/home/sakagawa/.micromamba/bin/micromamba' && export MAMBA_ROO
 ```toml
 [triangulation]
 handle_LR_swap = false           # 必須: trueだとL/R重なり発生
-undistort_points = false         # 現状はfalseが安定（キャリブ改善後にtrue検討）
+undistort_points = true          # k3解放後はtrue推奨（BoneCV/Smooth/L-R全改善）
 reproj_error_threshold_triangulation = 15.0  # 現状維持
 likelihood_threshold_triangulation = 0.4     # 精度向上には0.5も検討可
 min_cameras_for_triangulation = 2            # 精度向上には3も検討可
@@ -205,6 +214,17 @@ use_custom_logging = false       # save_logs/levelは未実装。これだけが
 Pose2Simのログは**セッションの親ディレクトリ**に書き込まれる（level=1の場合）。各trialディレクトリ内の`logs.txt`は古い場合がある。最新ログは `/home/sakagawa/git/pose2sim/Pose2Sim/logs.txt` を確認すること。
 
 **Config.tomlの`[logging]`セクション**: `save_logs` と `level` はPose2Simコードで**未実装**（無視される）。唯一認識されるのは `use_custom_logging`（デフォルトfalse）。
+
+### intrinsicsキャリブレーション実装の設計制約（2026-02-28調査済み）
+
+**ファイル**: `Pose2Sim/calibration.py`
+
+3つの制約を特定済み:
+1. ~~**歪みモデル4パラメータ制限**（行789）~~ → **案A完了**: `CALIB_FIX_K3`除去済み、5パラメータモデルに変更済み。TRC品質改善したが内部パラメーター推定はまだ不十分（undistort時にcam01/cam03が35-38%除外）
+2. **alpha=1問題**（`common.py:281`）: `getOptimalNewCameraMatrix` のalpha=1が高歪みカメラの端を含む → **案Bで次に対処**
+3. **画像品質フィルタなし**（行598-609）: コーナー検出できた全画像を無条件採用
+
+改善は ~~案A（k3解放）~~ → **案B（alpha調整）★次** → 案C（画像フィルタ）の段階的アプローチで進める。
 
 ### triangulation()のC3D変換バグ（2026-02-28修正済み）
 

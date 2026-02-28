@@ -786,7 +786,7 @@ def calibrate_intrinsics(calib_dir, intrinsics_config_dict, save_debug_images=Tr
         objpoints = [pts.astype(np.float32) for pts in objpoints]
         imgpoints = [pts.astype(np.float32) for pts in imgpoints]
         ret_cam, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, img.shape[1::-1], 
-                                    None, None, flags=(cv2.CALIB_FIX_K3+cv2.CALIB_USE_LU))# + cv2.CALIB_FIX_PRINCIPAL_POINT))
+                                    None, None, flags=cv2.CALIB_USE_LU)# k3 enabled for better distortion modeling
         h, w = [np.float32(i) for i in img.shape[:-1]]
         ret.append(ret_cam)
         C.append(cam)
@@ -1496,7 +1496,7 @@ def toml_write(calib_path, C, S, D, K, R, T):
             name = f'name = "{C[c]}"\n'
             size = f'size = [ {S[c][0]}, {S[c][1]}]\n' 
             mat = f'matrix = [ [ {K[c][0,0]}, 0.0, {K[c][0,2]}], [ 0.0, {K[c][1,1]}, {K[c][1,2]}], [ 0.0, 0.0, 1.0]]\n'
-            dist = f'distortions = [ {D[c][0]}, {D[c][1]}, {D[c][2]}, {D[c][3]}]\n' 
+            dist = f'distortions = [ {D[c][0]}, {D[c][1]}, {D[c][2]}, {D[c][3]}, {D[c][4]}]\n'
             rot = f'rotation = [ {R[c][0]}, {R[c][1]}, {R[c][2]}]\n'
             tran = f'translation = [ {T[c][0]}, {T[c][1]}, {T[c][2]}]\n'
             fish = f'fisheye = false\n\n'
