@@ -134,144 +134,71 @@ Bashツールから使う場合は以下を先頭に付ける:
 export MAMBA_EXE='/home/sakagawa/.micromamba/bin/micromamba' && export MAMBA_ROOT_PREFIX='/home/sakagawa/micromamba' && eval "$("$MAMBA_EXE" shell hook --shell bash --root-prefix "$MAMBA_ROOT_PREFIX" 2>/dev/null)" && micromamba activate Pose2Sim && <コマンド>
 ```
 
-## 作業ルール
+## 開発方針
 
-### 基本フロー
+- **シンプルな機能を一つずつ作り、積み重ねて目的を達成する**
+- 大きな機能を一度に作らない。小さく作って動作確認し、次の機能へ進む
 
-各改善ステップは以下の流れで進める:
+### 機能ごとの開発フロー
 
-1. **調査→計画**: planモードを使用。コードベース調査・方針策定を行い、ユーザーに計画を提示する
-2. **承認**: ユーザーが計画を確認・承認する
-3. **ドキュメント更新（必須）**: 承認直後、実行前に必ず以下を更新する:
-   - `docs/{管理番号}_{名称}/README.md` に調査結果・計画内容を記録
-   - `docs/accuracy_improvement_plan.md` のステップ一覧・変更履歴を更新
-   - `CLAUDE.md` に新たな知見があれば追記
-4. **実行**: 承認された計画に基づいて実施する
+各案件（改善ステップ・新機能・バグ修正）について、以下のフローを**厳守**する。**planモードは使わない**（通常モードで調査・計画を行う）。
 
-### 実行時のルール
+1. **案件作成** → `docs/{NNN}_{名称}/` フォルダを作成し、`docs/accuracy_improvement_plan.md` に追加する
+2. **調査・計画** → 通常モードで既存コードを調査し、要求仕様書（`docs/REQUIREMENTS_STANDARD.md` 準拠）と機能設計書（`docs/DESIGN_STANDARD.md` 準拠）を作成する
+3. **ドキュメント保存** → 要求仕様書を `docs/{NNN}_{名称}/requirements.md`、機能設計書を `docs/{NNN}_{名称}/design.md` にファイル保存する。**保存が完了するまで実装に進んではならない**
+4. **レビュー（Subagent + 人）** → 保存されたドキュメントをSubagent（Agentツール）でレビューする。ユーザーも同時にレビューする。レビュー実行時は `docs/REVIEW_CRITERIA.md` の基準に従うこと
+5. **修正（必要な場合）** → レビューで問題があれば、再調査してドキュメントを更新する。**ステップ2〜4を問題がなくなるまで繰り返す**
+6. **引き継ぎ・/clear** → CLAUDE.mdの「現在進行中の案件」セクションを更新し、実装セッションに必要な情報を整える。その後ユーザーが `/clear` を実行
+7. **実装** → ドキュメント（要求仕様書・機能設計書・CLAUDE.md）を読んで実装
 
-- **テスト（Pose2Simの処理実行、精度評価、パラメータ比較など）はsubagent（Taskツール）を使って実行する。** メインの会話コンテキストを消費せず、並列実行も可能にするため。
+### ドキュメント作成ルール
+
+- **実装前に必ず「要求仕様書」と「機能設計書」を作成し、案件フォルダにファイル保存すること**
+- ドキュメントが保存されていない場合は、**実装を中止**する
+- 要求仕様書：何を達成すべきか（入出力、制約、品質基準）。作成時は `docs/REQUIREMENTS_STANDARD.md` の基準に従うこと
+- 機能設計書：どう実現するか（モジュール構成、アルゴリズム、データ構造）。作成時は `docs/DESIGN_STANDARD.md` の基準に従うこと
+- ドキュメントは `docs/{NNN}_{名称}/` に置く（`requirements.md`, `design.md`）
+- **/clear 後でも実装がスムーズにできるよう、必要な情報を全て記述する**
+- 暗黙知に頼らず、**自己完結したドキュメント**にする（前の会話コンテキストがなくても実装できること）
+- レビュー実行時は `docs/REVIEW_CRITERIA.md` の基準に従うこと
+- ライブラリの追加・変更・削除を行った場合は `docs/TECH_STACK.md` も更新すること
+- 新規ライブラリ導入時は用途・選定理由・バージョンを `docs/TECH_STACK.md` に追記すること
+
+### テスト
+
+- **テスト実行はSubagent（Agentツール）を使う。** メインの会話コンテキストを消費せず、並列実行も可能にするため
+- テスト実行コマンド（Pose2Simパイプライン・精度評価・パラメータ比較など）:
+  ```bash
+  export MAMBA_EXE='/home/sakagawa/.micromamba/bin/micromamba' && export MAMBA_ROOT_PREFIX='/home/sakagawa/micromamba' && eval "$("$MAMBA_EXE" shell hook --shell bash --root-prefix "$MAMBA_ROOT_PREFIX" 2>/dev/null)" && micromamba activate Pose2Sim && <テストコマンド>
+  ```
+- **テスト結果は案件フォルダ内にファイル保存する**
+  - 保存先: `docs/{NNN}_{名称}/test_results/`
+  - 内容: 実行コマンド・出力・trc_evaluate結果などをそのまま保存する
 
 ### 管理ドキュメント
 
-- 改善計画: `docs/accuracy_improvement_plan.md`
-- 各ステップ詳細: `docs/{管理番号}_{名称}/README.md`
+- 案件一覧・進捗管理: `docs/accuracy_improvement_plan.md`
+- 各案件の詳細: `docs/{NNN}_{名称}/`（`requirements.md`, `design.md`, `README.md`）
+- 技術スタック: `docs/TECH_STACK.md`
 
 ### セッション開始時
 
 `/clear`や新規セッション開始時は、まず `docs/accuracy_improvement_plan.md` を読んで現在の進捗を把握すること。
 
-## 三角測量の既知の問題と対策（2026-02-27調査済み）
+## Pose2Simの既知の注意点
 
-### handle_LR_swap=true による左右キーポイント重なり問題
+調査結果の詳細は各案件ドキュメントを参照: `docs/accuracy_improvement_plan.md`
 
-**対象データ**: `20251127-dgtw-lab2` / `20260227-dgtw2-lab2`（同一データ、後者は設定変更版）
+### ログファイル
 
-**症状**: 3D三角測量結果で右腕と左腕がほぼ同一座標に重なる（肩距離0.007m等）。肩39%、肘71%、手首76%のフレームで発生。
+- Pose2Simのログは**セッションの親ディレクトリ**に書き込まれる。最新ログは `/home/sakagawa/git/pose2sim/Pose2Sim/logs.txt` を確認すること
+- Config.tomlの `save_logs` / `level` は**未実装**（無視される）。認識されるのは `use_custom_logging` のみ
 
-**原因**: `handle_LR_swap = true` のスワップアルゴリズムが、一部カメラのL/Rラベルを誤って入れ替え、左右の中間点に収束させていた。2Dポーズデータ自体にはL/R混同なし（各カメラで80〜145px分離）。
+### ローカル修正済みのPose2Simバグ
 
-**対策**: `Config.toml` で `handle_LR_swap = false` に設定。修正後は全フレームでL/R重なり0件、急反転も0件。
-
-### undistort_points=true での再投影誤差増加（002で部分改善済み）
-
-**症状**: `undistort_points = true` にすると再投影誤差が増加（9.9px→11.4px）、カメラ除外率が倍増（0.48→0.96台）。cam01/cam03の除外率が35-38%に。
-
-**原因**: cam01/cam03の望遠レンズの歪みモデル精度が不十分。
-
-**002で実施した対策**: `CALIB_FIX_K3` を除去してk3パラメータを解放→5パラメータモデルで再キャリブレーション。
-
-**結果**: 再投影誤差・カメラ除外率は改善しなかったが、**TRC品質は全指標で改善**:
-- Bone CV: 18.0% → 16.4%
-- Smoothness: 0.0189 → 0.0139 (-26%)
-- L-R Diff: 6.3% → 4.9%
-
-**現在の推奨**: `undistort_points = true` を使用。カメラ除外が増えても残ったカメラでの三角測量の質が向上するため。
-
-**案B/Cの結果**: 案B（alpha=0）はcam除外率改善だがSmooth/L-R悪化で不採用。案C（画像品質フィルタ）はcam01のみ13枚除外で効果限定的、不採用。案A設定を維持。コードは`calibration.py`に残置（害なし）。
-
-### カメラ配置と構造的制約（2026-03-02調査済み）
-
-**カメラ構成**: 4台カメラ cam01〜cam04（すべて1920x1080）
-
-| カメラ | X (m) | Y (m) | Z (m) | 焦点距離 (fx) | レンズ種別 |
-|--------|--------|--------|--------|---------------|-----------|
-| cam01 | 3.879 | 0.538 | 1.052 | 2014 | 望遠 |
-| cam02 | 2.441 | -0.206 | 1.026 | 1189 | 広角 |
-| cam03 | 3.280 | 1.878 | 1.072 | 2037 | 望遠 |
-| cam04 | 1.558 | 2.553 | 0.844 | 1182 | 広角 |
-
-- cam01/cam03: レンズ歪み大（k1≈-0.15）、cam02/cam04: レンズ歪み小（k1≈-0.03）
-- カメラ間距離: 1.5〜3.1m
-
-**配置の問題**: 4台すべてが+X側に半円〜L字型に並び、-X方向（原点=被験者エリア）を向く片側配置。被験者の周囲を囲んでいないため、**左半身が全カメラから見て体幹による自己遮蔽を受ける**死角が存在する。
-
-**影響**: LWrist/LElbow/LHipが系統的に低信頼度（2D推定の信頼度: LWrist平均0.726、LElbow平均0.786）。cam03:LWristは40.3%が危険ゾーン（信頼度0.4-0.6）。この問題は三角測量パラメータ調整（004-006）では解決不可能であり、**カメラ再配置が必要**。
-
-**004-006凍結の理由**: カメラ片側配置の構造的制約により、現データでのパラメータ最適化は精度改善が期待できない。カメラ再配置後の新映像データで再開予定。
-
-### fill_large_gaps_with戦略（007で評価済み、2026-03-02）
-
-**三角測量のギャップ処理フロー**（triangulation.py:888-926）:
-1. Phase 1: gaps ≤ `interp_if_gap_smaller_than`(15f) → 線形補間
-2. Phase 2: 残りの大ギャップ → `fill_large_gaps_with`で充填
-
-**本データセットのギャップ**: 5/26マーカーに大ギャップ存在（合計251フレーム、0.55%）。RSmallToe(106f), RBigToe(73f), RHeel(32f), LElbow(21f), LWrist(19f)。問題集中区間: f196-291, f1091-1192。
-
-**3戦略の比較結果（フィルタリング後TRC）**:
-
-| 指標 | last_value | nan | zeros |
-|------|-----------|-----|-------|
-| Bone CV | 16.3% | **15.4%** | nanと同等 |
-| Smoothness | 0.0140 | **0.0139** | nanと同等 |
-| L-R Diff | 4.7% | **4.1%** | nanと同等 |
-| NaN率 | 0.0% | 0.5% | nanと同等 |
-| LSTM互換 | 動作する | NaN出力 | 無意味な出力 |
-
-**結論**: `nan`採用。`last_value`は凍結→テレポートジャンプ（最大570mm@LElbow）を生成し全品質指標を悪化させる。`zeros`は`nan`の下位互換（filtering.pyの`eq(0)`マスクでゼロも欠損扱い）。LSTMはどの戦略でもギャップ部分の出力は信頼できない。
-
-### 推奨Config.toml設定（20251127-dgtw-lab2系）
-
-```toml
-[triangulation]
-handle_LR_swap = false           # 必須: trueだとL/R重なり発生
-undistort_points = true          # k3解放後はtrue推奨（BoneCV/Smooth/L-R全改善）
-reproj_error_threshold_triangulation = 15.0  # 現状維持
-likelihood_threshold_triangulation = 0.4     # 精度向上には0.5も検討可
-min_cameras_for_triangulation = 2            # 精度向上には3も検討可
-fill_large_gaps_with = "nan"                 # 007結果: nanがlast_valueより全指標改善
-make_c3d = true                  # C3D変換（バグ修正済みで動作する）
-
-[filtering]
-display_figures = false          # バッチ実行時はfalse推奨
-save_filt_plots = true           # フィルタプロットを保存
-make_c3d = true                  # フィルタ後のC3D生成（必須: 明示しないとNone=無効）
-
-[logging]
-use_custom_logging = false       # save_logs/levelは未実装。これだけが有効
-```
-
-### ログファイルの注意点
-
-Pose2Simのログは**セッションの親ディレクトリ**に書き込まれる（level=1の場合）。各trialディレクトリ内の`logs.txt`は古い場合がある。最新ログは `/home/sakagawa/git/pose2sim/Pose2Sim/logs.txt` を確認すること。
-
-**Config.tomlの`[logging]`セクション**: `save_logs` と `level` はPose2Simコードで**未実装**（無視される）。唯一認識されるのは `use_custom_logging`（デフォルトfalse）。
-
-### intrinsicsキャリブレーション実装の設計制約（2026-02-28調査済み）
-
-**ファイル**: `Pose2Sim/calibration.py`
-
-3つの制約を特定し、すべて対処済み:
-1. ~~**歪みモデル4パラメータ制限**（行789）~~ → **案A完了・採用**: `CALIB_FIX_K3`除去済み、5パラメータモデルに変更。TRC品質改善
-2. ~~**alpha=1問題**（`common.py:281`）~~ → **案B完了・不採用**: alpha=0でcam除外率改善するがSmooth/L-R悪化
-3. ~~**画像品質フィルタなし**~~ → **案C完了・不採用**: 画像品質フィルタ実装済みだが効果限定的（cam01のみ13枚除外）
-
-**結論**: キャリブレーション側の改善は案Aのk3解放のみ有効。cam01/cam03の除外率35-39%はキャリブレーションでは解決困難。
-
-### triangulation()のC3D変換バグ（2026-02-28修正済み）
-
-**ファイル**: `Pose2Sim/triangulation.py` 行929
-**症状**: `make_c3d = true` にしてもtriangulation()後にC3Dファイルが生成されない。ログには「All trc files have been converted to c3d.」と出力されるが虚偽。
-**原因**: `c3d_paths.append(convert_to_c3d(t) for t in trc_paths)` がジェネレータ式をappendしており、`convert_to_c3d()`が実行されない。
-**修正**: `c3d_paths.append(convert_to_c3d(trc_paths[-1]))` に変更（ローカル修正済み）。
-**回避策**: filtering()の `[filtering]` セクションに `make_c3d = true` を設定すればC3D生成可（filtering.pyのコードは正しい）。
+| ファイル | 内容 | 状態 |
+|---------|------|------|
+| `triangulation.py` 行929 | C3D変換のジェネレータ式バグ修正 | コミット済み |
+| `calibration.py` 行789 | CALIB_FIX_K3除去（k3解放） | 未コミット |
+| `calibration.py` 行1499 | distortions 5パラメータ書き出し | 未コミット |
+| `calibration.py` 行791-816 | 画像品質フィルタリング追加（案C） | 未コミット |
