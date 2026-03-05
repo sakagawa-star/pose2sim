@@ -27,6 +27,7 @@ tests_pose2sim
 | `20251024_osaka-hosp.1min/` | 大阪病院、1分間、複数カメラ |
 | `20251024_osaka-hosp.1min.3cam/` | 大阪病院、1分間、3カメラ限定 |
 | `20251024_osaka-hosp.Calib_PortalCam.10min/` | 大阪病院、PortalCam、10分 |
+| `20251024_osaka-hosp.PortalCam.01hour/` | 大阪病院、PortalCam、1時間（3cam, 10.8万フレーム, 常時3人検出, 30fps）★011調査対象 |
 | `20251024_osaka-hosp.1hour/` | 大阪病院、1時間 |
 | `20251113_dgtw-lab2/` | dgtw-lab2実験室（11月13日） |
 | `20251114_dgtw-lab2/` | dgtw-lab2実験室（11月14日） |
@@ -184,6 +185,42 @@ export MAMBA_EXE='/home/sakagawa/.micromamba/bin/micromamba' && export MAMBA_ROO
 ### セッション開始時
 
 `/clear`や新規セッション開始時は、まず `docs/accuracy_improvement_plan.md` を読んで現在の進捗を把握すること。
+
+## 現在進行中の案件（2026-03-05）
+
+**011/012/013: Phase 1の分析スクリプト実装待ち**
+
+3つの調査タスクが並列実行可能。各 `requirements.md` と `design.md` を読んで実装する。
+
+| 管理番号 | 実装するスクリプト | 対象データ |
+|---------|-------------------|-----------|
+| 011 | `Pose2Sim/Utilities/id_switch_analyze.py` | `20251024_osaka-hosp.PortalCam.01hour`（3cam, 10.8万フレーム, 大部分1人検出） |
+| 012 | `Pose2Sim/Utilities/keypoint_jitter_analyze.py` | `20260227-dgtw2-lab2`（4cam, 1800フレーム, 単一人物） |
+| 013 | `Pose2Sim/Utilities/head_keypoint_analyze.py` | `20260227-dgtw2-lab2` + TRCファイル |
+
+### 011実装時の重要な注意点（2026-03-05調査で判明）
+
+1. **NaN空エントリのフィルタリング必須**: JSONのpeople配列にはNaN埋めの空エントリが含まれる。`len(people)`を検出人数としてはならない。有効キーポイント（conf>0かつ非NaN）が1つ以上あるpersonのみカウントする。詳細は`requirements.md`セクション7-8参照
+2. **person_id=-1はハードコード**: `poseEstimation.py:261`で常に`[-1]`固定。トラッキングIDはJSON出力に反映されない
+3. **IDスイッチの検出方法**: キーポイント距離ベース＋ハンガリアン法で事後的にフレーム間人物対応付けを行う（Pose2Simの`sort_people_sports2d`と同じロジック）
+4. **multi_person=falseの影響**: poseEstimation（sports2dモード）には影響なし。personAssociationで1人選択に強制、triangulationでpeople[0]のみ三角測量
+
+### 重要: HALPE_26キーポイントインデックスの2つの順序体系
+
+JSON配列（2Dデータ）とTRC列（3Dデータ）でキーポイントの順序が異なる。混同しないこと。
+
+| キーポイント | JSON idx (skeletons.py id) | TRC列順 (ツリー走査) |
+|---|---|---|
+| Nose | **0** | 15 |
+| LEye | **1** | 16 |
+| REye | **2** | 17 |
+| LEar | **3** | 18 |
+| REar | **4** | 19 |
+| Head | **17** | 14 |
+| Neck | **18** | 13 |
+| Hip | **19** | 0 |
+
+2D分析スクリプトではJSON idx（skeletons.py id属性）を使用する。3D分析ではTRCのマーカー名でアクセスする。
 
 ## Pose2Simの既知の注意点
 
