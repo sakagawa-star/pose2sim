@@ -105,6 +105,8 @@ trc_evaluate -i file.trc                      # TRC品質評価（BoneCV/Smoothn
 trc_evaluate -i before.trc after.trc          # 2ファイル比較モード
 pose_confidence_analyze -p /path/to/pose_dir  # 2Dキーポイント信頼度分析（カメラ別×キーポイント別）
 pose_confidence_analyze -p dir -t 0.5 --no-plot  # 閾値変更・プロット省略
+id_switch_analyze -p /path/to/pose_dir        # IDスイッチ分析（検出人数変動・フレーム間マッチング）
+id_switch_analyze -p dir -o output/ --fps 30  # 出力先・FPS指定
 ```
 
 ## アーキテクチャ概要
@@ -186,24 +188,27 @@ export MAMBA_EXE='/home/sakagawa/.micromamba/bin/micromamba' && export MAMBA_ROO
 
 `/clear`や新規セッション開始時は、まず `docs/accuracy_improvement_plan.md` を読んで現在の進捗を把握すること。
 
-## 現在進行中の案件（2026-03-05）
+## 現在進行中の案件（2026-03-10）
 
-**011/012/013: Phase 1の分析スクリプト実装待ち**
+| 管理番号 | 状態 | 実装するスクリプト | 次のアクション |
+|---------|------|-------------------|--------------|
+| 011 | **Phase 1完了** | `id_switch_analyze.py`（実装済み） | — |
+| 012 | **Phase 1完了・調査停止中** | `keypoint_jitter_analyze.py`（実装済み） | 動画確認後にPhase 2着手判断 |
+| 013 | **Phase 1実装待ち** | `head_keypoint_analyze.py` | `requirements.md`と`design.md`を読んで実装 |
 
-3つの調査タスクが並列実行可能。各 `requirements.md` と `design.md` を読んで実装する。
+### 012の現状（調査停止中）
 
-| 管理番号 | 実装するスクリプト | 対象データ |
-|---------|-------------------|-----------|
-| 011 | `Pose2Sim/Utilities/id_switch_analyze.py` | `20251024_osaka-hosp.PortalCam.01hour`（3cam, 10.8万フレーム, 大部分1人検出） |
-| 012 | `Pose2Sim/Utilities/keypoint_jitter_analyze.py` | `20260227-dgtw2-lab2`（4cam, 1800フレーム, 単一人物） |
-| 013 | `Pose2Sim/Utilities/head_keypoint_analyze.py` | `20260227-dgtw2-lab2` + TRCファイル |
+- `keypoint_jitter_analyze.py` 実装済み、`pyproject.toml` エントリーポイント追加済み
+- Phase 1分析完了: 6,627件の暴れイベント検出。パターンE(68.7%)が全カメラ共通→RTMpose推定の揺らぎが主因
+- 足先の暴れは障害物遮蔽（想定通り）。上半身はLWrist(272件)とHead/Ear(191-228件)がやや多い
+- **動画確認が未実施**: フレーム985/935/1000/1020付近のパターンE多発箇所を確認する必要あり
+- 詳細は `docs/012_2d_keypoint_jitter/phase1_results.md` を参照
 
-### 011実装時の重要な注意点（2026-03-05調査で判明）
+### 013実装の参考情報
 
-1. **NaN空エントリのフィルタリング必須**: JSONのpeople配列にはNaN埋めの空エントリが含まれる。`len(people)`を検出人数としてはならない。有効キーポイント（conf>0かつ非NaN）が1つ以上あるpersonのみカウントする。詳細は`requirements.md`セクション7-8参照
-2. **person_id=-1はハードコード**: `poseEstimation.py:261`で常に`[-1]`固定。トラッキングIDはJSON出力に反映されない
-3. **IDスイッチの検出方法**: キーポイント距離ベース＋ハンガリアン法で事後的にフレーム間人物対応付けを行う（Pose2Simの`sort_people_sports2d`と同じロジック）
-4. **multi_person=falseの影響**: poseEstimation（sports2dモード）には影響なし。personAssociationで1人選択に強制、triangulationでpeople[0]のみ三角測量
+- **011/012の実装パターンを踏襲**: `id_switch_analyze.py`, `keypoint_jitter_analyze.py`, `pose_confidence_analyze.py` が既存の類似CLIツール
+- **pyproject.tomlにエントリーポイント追加が必要**: `head_keypoint_analyze = "Pose2Sim.Utilities.head_keypoint_analyze:main"`
+- **pip install -e .** でエントリーポイントを反映してからテスト実行
 
 ### 重要: HALPE_26キーポイントインデックスの2つの順序体系
 
