@@ -116,7 +116,7 @@ def process(input_dir, output_dir):
         except json.JSONDecodeError:
             print(f'Warning: JSON parse error, skipping: {f}', file=sys.stderr)
             with open(out_path, 'w') as fp:
-                json.dump({'people': []}, fp)
+                json.dump({'version': 1.3, 'people': []}, fp)
             n_empty += 1
             continue
 
@@ -124,7 +124,7 @@ def process(input_dir, output_dir):
         selected = _select_person(people, prev_kp)
 
         if selected is None:
-            out_data = {'people': []}
+            out_data = {'version': 1.3, 'people': []}
             n_empty += 1
         else:
             # Count multi-person before selection
@@ -138,7 +138,17 @@ def process(input_dir, output_dir):
             if valid_count >= 2:
                 n_multi += 1
 
-            out_data = {'people': [{'pose_keypoints_2d': selected.flatten().tolist()}]}
+            out_data = {'version': 1.3, 'people': [{
+                'person_id': [-1],
+                'pose_keypoints_2d': selected.flatten().tolist(),
+                'face_keypoints_2d': [],
+                'hand_left_keypoints_2d': [],
+                'hand_right_keypoints_2d': [],
+                'pose_keypoints_3d': [],
+                'face_keypoints_3d': [],
+                'hand_left_keypoints_3d': [],
+                'hand_right_keypoints_3d': []
+            }]}
             prev_kp = selected
 
         with open(out_path, 'w') as fp:

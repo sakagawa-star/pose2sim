@@ -49,7 +49,7 @@
   1. 出力JSONの `people` 配列は選択された1人のみを含む（有効人物0人の場合は空配列）
   2. 出力JSONのファイル名は入力JSONと同一
   3. 出力JSONの `pose_keypoints_2d` の内容（座標・信頼度）は入力データと完全一致
-  4. 出力JSONのフォーマットは入力と同じ構造（`{"people": [{"pose_keypoints_2d": [...]}]}`）
+  4. 出力JSONはPose2Simの正規フォーマット（`poseEstimation.py:260-273`）に準拠する（`version`, `person_id`, `pose_keypoints_2d`, `face_keypoints_2d`, `hand_left_keypoints_2d`, `hand_right_keypoints_2d`, `pose_keypoints_3d`, `face_keypoints_3d`, `hand_left_keypoints_3d`, `hand_right_keypoints_3d`）
 
 ### FR-004: CLIインターフェース
 

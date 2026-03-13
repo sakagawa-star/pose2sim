@@ -141,13 +141,28 @@ def _select_person(people, prev_kp):
 
 #### 処理ロジック
 
+出力JSONはPose2Simの正規フォーマット（`poseEstimation.py:260-273`）に準拠する。
+
 ```
 1. 出力ファイルパス = os.path.join(output_dir, os.path.basename(input_json_path))
 2. 選択結果が None の場合:
-     出力JSON = {"people": []}
+     出力JSON = {"version": 1.3, "people": []}
 3. 選択結果がある場合:
      kp_list = selected_kp.flatten().tolist()
-     出力JSON = {"people": [{"pose_keypoints_2d": kp_list}]}
+     出力JSON = {
+       "version": 1.3,
+       "people": [{
+         "person_id": [-1],
+         "pose_keypoints_2d": kp_list,
+         "face_keypoints_2d": [],
+         "hand_left_keypoints_2d": [],
+         "hand_right_keypoints_2d": [],
+         "pose_keypoints_3d": [],
+         "face_keypoints_3d": [],
+         "hand_left_keypoints_3d": [],
+         "hand_right_keypoints_3d": []
+       }]
+     }
 4. json.dump で書き出し（デフォルトフォーマット、indent なし）
 ```
 
@@ -156,10 +171,6 @@ def _select_person(people, prev_kp):
 **JSONフォーマット**:
 - 採用: `json.dump(data, fp)` でデフォルトフォーマット（コンパクト）
 - 却下: `indent=4` 付き整形出力 → ファイルサイズが大幅増加（97,425ファイル）、Pose2Simは整形不要
-
-**出力JSONの構造**:
-- 採用: `{"people": [{"pose_keypoints_2d": [...]}]}` の最小構造
-- 却下: 入力JSONの全フィールドをコピー → 不要な複雑さ。Pose2Simが使うのは `pose_keypoints_2d` のみ
 
 ### 2.4 CLIインターフェース（FR-004）
 
@@ -253,8 +264,8 @@ main()
         │     ├── _select_person(people, prev_kp) で人物選択
         │     │     （people が空配列でも _select_person 内で valid_people=[] → None 返却で処理される。
         │     │      呼び出し元での事前チェックは不要。防御的に関数内部で完結する設計）
-        │     ├── 結果が None → {"people": []} を書き出し
-        │     ├── 結果が有効 → {"people": [{"pose_keypoints_2d": [...]}]} を書き出し
+        │     ├── 結果が None → {"version": 1.3, "people": []} を書き出し
+        │     ├── 結果が有効 → Pose2Sim正規フォーマット（version, person_id, 全キーポイントフィールド）で書き出し
         │     └── prev_kp を更新（None でない場合のみ）
         └── サマリ出力
 ```
@@ -278,8 +289,8 @@ main()
 
 ### DJ-002: 出力JSONの構造
 
-- **採用**: `{"people": [{"pose_keypoints_2d": [...]}]}` の最小構造
-- **却下**: 入力JSONの全フィールド保持 → `person_id`, `face_keypoints_2d` 等はPose2Simパイプラインで不使用。シンプルさ優先
+- **採用**: Pose2Simの正規フォーマット（`poseEstimation.py:260-273`）に準拠。`version`, `person_id`, 全キーポイントフィールドを含む
+- **却下（初版の設計、不具合により撤回）**: `{"people": [{"pose_keypoints_2d": [...]}]}` の最小構造 → Pose2Simパイプラインの各ステップ（`personAssociation.py`, `synchronization.py`等）がフィールドの存在を前提としており、欠落するとエラーになる
 
 ### DJ-003: CLIオプション名 `-i` / `--input`
 
