@@ -47,8 +47,68 @@ EDGE_MARGIN = 10  # pixels
 
 ## FUNCTIONS
 
+def _select_person(people, prev_kp):
+    '''Select the best person from a list of detected people.
+
+    When multiple people are detected, selects the person closest to the
+    previous frame's keypoints. Falls back to the person with the most
+    valid keypoints if no previous frame is available.
+
+    Parameters
+    ----------
+    people : list
+        List of people dicts from OpenPose JSON.
+    prev_kp : np.ndarray or None
+        Previous frame's keypoints, shape (26, 3). None if first frame.
+
+    Returns
+    -------
+    np.ndarray
+        Shape (26, 3) keypoints of the selected person.
+    '''
+    valid_people = []
+    for person in people:
+        kps = person.get('pose_keypoints_2d', [])
+        if len(kps) < 26 * 3:
+            continue
+        kp = np.array(kps).reshape(26, 3)
+        n_valid = np.sum((kp[:, 2] > CONF_THRESHOLD) & ~np.isnan(kp[:, 0]))
+        if n_valid >= 1:
+            valid_people.append(kp)
+
+    if not valid_people:
+        return None
+
+    if len(valid_people) == 1:
+        return valid_people[0]
+
+    if prev_kp is not None and not np.all(np.isnan(prev_kp)):
+        # Select person closest to previous frame (mean distance of shared valid keypoints)
+        best_kp = None
+        best_dist = float('inf')
+        prev_valid = (prev_kp[:, 2] > CONF_THRESHOLD) & ~np.isnan(prev_kp[:, 0])
+        for kp in valid_people:
+            curr_valid = (kp[:, 2] > CONF_THRESHOLD) & ~np.isnan(kp[:, 0])
+            shared = prev_valid & curr_valid
+            if shared.sum() == 0:
+                continue
+            dist = np.mean(np.sqrt(np.sum((kp[shared, :2] - prev_kp[shared, :2])**2, axis=1)))
+            if dist < best_dist:
+                best_dist = dist
+                best_kp = kp
+        if best_kp is not None:
+            return best_kp
+
+    # Fallback: person with most valid keypoints
+    best_kp = max(valid_people, key=lambda kp: np.sum(kp[:, 2] > CONF_THRESHOLD))
+    return best_kp
+
+
 def load_keypoints_series(cam_json_dir):
     '''Load all frames' keypoints from a single camera directory.
+
+    Handles multi-person frames by selecting the person closest to the
+    previous frame's keypoints (tracking by proximity).
 
     Parameters
     ----------
@@ -65,13 +125,17 @@ def load_keypoints_series(cam_json_dir):
         raise FileNotFoundError(f'No JSON files found in {cam_json_dir}')
 
     keypoints_series = np.full((len(files), 26, 3), np.nan)
+    prev_kp = None
 
     for i, f in enumerate(tqdm(files, desc=os.path.basename(str(cam_json_dir)))):
         with open(f) as fp:
             data = json.load(fp)
-        if data.get('people') and len(data['people']) > 0:
-            kp = np.array(data['people'][0]['pose_keypoints_2d']).reshape(26, 3)
-            keypoints_series[i] = kp
+        people = data.get('people', [])
+        if people:
+            kp = _select_person(people, prev_kp)
+            if kp is not None:
+                keypoints_series[i] = kp
+                prev_kp = kp
 
     return keypoints_series
 
@@ -581,13 +645,20 @@ def analyze_jitter(pose_dir, output=None, multiplier=DEFAULT_MULTIPLIER,
 
     cam_dirs = sorted(pose_dir.glob('cam*_json'))
     if not cam_dirs:
-        raise FileNotFoundError(f'No cam*_json directories found in {pose_dir}')
+        # Try *_json pattern for non-standard directory names
+        cam_dirs = sorted(pose_dir.glob('*_json'))
+    if not cam_dirs:
+        # Check if pose_dir itself contains JSON files
+        if list(pose_dir.glob('*.json')):
+            cam_dirs = [pose_dir]
+    if not cam_dirs:
+        raise FileNotFoundError(f'No JSON directories found in {pose_dir}')
 
     print(f'Loading pose data from {pose_dir} ...')
     cam_results = {}
     all_events = []
     for cam_dir in cam_dirs:
-        cam_name = cam_dir.name.replace('_json', '')
+        cam_name = cam_dir.name.replace('_json', '') if cam_dir.name.endswith('_json') else cam_dir.name
         print(f'\nAnalyzing {cam_name} ...')
         result = analyze_camera(cam_dir, multiplier, image_size)
         cam_results[cam_name] = result
@@ -611,7 +682,7 @@ def main():
         description='Analyze 2D keypoint jitter (frame-to-frame displacement anomalies). '
                     'Detects and classifies jitter events by cause pattern.')
     parser.add_argument('-p', '--pose-dir', required=True,
-                        help='Pose directory path containing cam*_json subdirectories.')
+                        help='Pose directory containing *_json subdirectories, or a directory with JSON files directly.')
     parser.add_argument('-o', '--output', default=None,
                         help='Output directory. Default: docs/012_2d_keypoint_jitter/test_results/')
     parser.add_argument('--multiplier', type=float, default=DEFAULT_MULTIPLIER,

@@ -188,13 +188,41 @@ export MAMBA_EXE='/home/sakagawa/.micromamba/bin/micromamba' && export MAMBA_ROO
 
 `/clear`や新規セッション開始時は、まず `docs/accuracy_improvement_plan.md` を読んで現在の進捗を把握すること。
 
-## 現在進行中の案件（2026-03-10）
+## 現在進行中の案件（2026-03-13）
 
 | 管理番号 | 状態 | 実装するスクリプト | 次のアクション |
 |---------|------|-------------------|--------------|
 | 011 | **Phase 1完了** | `id_switch_analyze.py`（実装済み） | — |
 | 012 | **Phase 1完了・調査停止中** | `keypoint_jitter_analyze.py`（実装済み） | 動画確認後にPhase 2着手判断 |
 | 013 | **Phase 1実装待ち** | `head_keypoint_analyze.py` | `requirements.md`と`design.md`を読んで実装 |
+| 014 | **機能設計書作成待ち** | `pose_extract_person.py` | 機能設計書を作成→実装 |
+
+### 014: 主要人物抽出CLIツール（pose_extract_person）
+
+**目的**: OpenPose形式のJSONディレクトリから、主要人物（患者）のみを抽出して新しいJSONディレクトリに書き出すCLIツール。
+
+**背景**:
+- `20150910_osaka_hosp` のデータ（97,425フレーム、単一カメラ）で、168フレームに看護師が映り込んでいる
+- `personAssociation()`は複数カメラ間の対応付けであり、単一カメラ内のフレーム間追跡には使えない
+- `keypoint_jitter_analyze.py`の`_select_person`関数（前フレーム追跡ロジック）を流用する
+
+**想定CLI**:
+```
+pose_extract_person -i <入力JSONディレクトリ> -o <出力JSONディレクトリ>
+```
+
+**実装の参考**:
+- `keypoint_jitter_analyze.py`の`_select_person()`関数: 前フレームとのキーポイント距離で同一人物を追跡
+- `pose_confidence_analyze.py`, `id_switch_analyze.py`: CLIパターン・エントリーポイント登録方法
+- **pyproject.tomlにエントリーポイント追加が必要**: `pose_extract_person = "Pose2Sim.Utilities.pose_extract_person:main"`
+
+**人物選択ロジック**:
+1. people配列から有効人物（conf > 0.1のキーポイントが1つ以上）をフィルタ
+2. 1人のみ → そのまま選択
+3. 複数人 → 前フレームの人物に最も近い人物を選択（共有キーポイントの平均距離）
+4. 前フレームがない場合 → 有効キーポイント数が最多の人物を選択
+
+**既存の実行実績**: `20150910_osaka_hosp`データで実行済み。97,425フレームを約10秒で処理、168フレームの複数人フレームで患者を正しく選択
 
 ### 012の現状（調査停止中）
 
@@ -203,6 +231,12 @@ export MAMBA_EXE='/home/sakagawa/.micromamba/bin/micromamba' && export MAMBA_ROO
 - 足先の暴れは障害物遮蔽（想定通り）。上半身はLWrist(272件)とHead/Ear(191-228件)がやや多い
 - **動画確認が未実施**: フレーム985/935/1000/1020付近のパターンE多発箇所を確認する必要あり
 - 詳細は `docs/012_2d_keypoint_jitter/phase1_results.md` を参照
+
+### 012の追加改修（未コミット）
+
+- `keypoint_jitter_analyze.py`に`_select_person()`関数を追加（複数人フレーム対応）
+- ディレクトリ検索パターン拡張: `cam*_json` → `*_json` → 直接JSONディレクトリのフォールバック
+- `20150910_osaka_hosp`データで暴れ分析を実行済み（結果: `/tmp/jitter_20150910/`）
 
 ### 013実装の参考情報
 
