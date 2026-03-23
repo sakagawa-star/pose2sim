@@ -425,7 +425,7 @@ def kalman_filter_1d(config_dict, frame_rate, col):
     falsemask_indices = np.where(~mask)[0]
     gaps = np.where(np.diff(falsemask_indices) > 1)[0] + 1 
     idx_sequences = np.split(falsemask_indices, gaps)
-    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 2]
+    idx_sequences_to_filter = [seq for seq in idx_sequences if len(seq) >= 4]
 
     # Filter each of the selected sequences
     for seq_f in idx_sequences_to_filter:
