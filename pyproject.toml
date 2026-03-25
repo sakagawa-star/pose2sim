@@ -98,6 +98,7 @@ pose_confidence_analyze = "Pose2Sim.Utilities.pose_confidence_analyze:main"
 id_switch_analyze = "Pose2Sim.Utilities.id_switch_analyze:main"
 keypoint_jitter_analyze = "Pose2Sim.Utilities.keypoint_jitter_analyze:main"
 pose_extract_person = "Pose2Sim.Utilities.pose_extract_person:main"
+pose_overlay_video = "Pose2Sim.Utilities.pose_overlay_video:main"
 
 tests_pose2sim = "Pose2Sim.Utilities.tests:main"
 Pose2Sim = "GUI.main:main"
