@@ -46,6 +46,9 @@ HALPE_26_INDICES = {
 
 N_KEYPOINTS = 26
 
+PERSON_COLORS = ['C0', 'C1', 'C2', 'C3', 'C4']  # C0=blue, C1=orange, C2=green, C3=red, C4=purple
+DEFAULT_COLOR = 'gray'  # Person 5以降
+
 
 ## FUNCTIONS
 
@@ -117,17 +120,34 @@ def process(json_dir, keypoint_names, output_dir, thresholds):
     if n_kp == 1:
         axes = [axes]
 
+    # Pre-group rows by (keypoint, person) for efficiency
+    grouped = {}
+    for frame_idx, person_idx, kp_name, conf in rows:
+        key = (kp_name, person_idx)
+        if key not in grouped:
+            grouped[key] = ([], [])
+        grouped[key][0].append(frame_idx)
+        grouped[key][1].append(conf)
+
     for ax, name in zip(axes, keypoint_names):
-        frames = [r[0] for r in rows if r[2] == name]
-        confs = [r[3] for r in rows if r[2] == name]
-        ax.scatter(frames, confs, s=1, alpha=0.5)
+        # Plot per person with color coding
+        person_indices = sorted(set(pidx for (kn, pidx) in grouped if kn == name))
+        for pidx in person_indices:
+            key = (name, pidx)
+            if key not in grouped:
+                continue
+            frames, confs = grouped[key]
+            color = PERSON_COLORS[pidx] if pidx < len(PERSON_COLORS) else DEFAULT_COLOR
+            ax.scatter(frames, confs, s=1, alpha=0.5, color=color, label=f'P{pidx}')
         ax.set_ylabel(name)
         ax.set_ylim(-0.05, 1.05)
 
+        # Threshold lines
         if thresholds:
             for th in thresholds:
-                ax.axhline(y=th, color='r', linestyle='--', alpha=0.5, label=f'{th}')
-            ax.legend(loc='lower right', fontsize=8)
+                ax.axhline(y=th, color='r', linestyle='--', alpha=0.5, label=f'thr={th}')
+
+        ax.legend(loc='lower right', fontsize=8, markerscale=5)
 
     axes[-1].set_xlabel('Frame')
     fig.suptitle('Keypoint Confidence Timeline')

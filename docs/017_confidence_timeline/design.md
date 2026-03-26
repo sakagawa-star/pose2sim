@@ -152,6 +152,15 @@ with open(csv_path, 'w', newline='') as f:
 - 入力: `rows`リスト、キーポイント名リスト、閾値リスト（任意）
 - 出力: `{output_dir}/confidence_timeline.png`
 
+#### 人物色分け定数
+
+```python
+PERSON_COLORS = ['C0', 'C1', 'C2', 'C3', 'C4']  # C0=blue, C1=orange, C2=green, C3=red, C4=purple
+DEFAULT_COLOR = 'gray'  # Person 5以降
+```
+
+matplotlibのデフォルトカラーサイクル `C0`〜`C4` を使用する。`C0`=青、`C1`=オレンジ、`C2`=緑、`C3`=赤、`C4`=紫。Person 5以降はグレー。
+
 #### 処理ロジック
 
 ```python
@@ -160,18 +169,23 @@ if n_keypoints == 1:
     axes = [axes]
 
 for ax, name in zip(axes, keypoint_names):
-    # このキーポイントのデータを抽出
-    frames = [r[0] for r in rows if r[2] == name]
-    confs = [r[3] for r in rows if r[2] == name]
-    ax.scatter(frames, confs, s=1, alpha=0.5)
+    # このキーポイントのデータを人物インデックス別に抽出・色分けプロット
+    kp_rows = [r for r in rows if r[2] == name]
+    person_indices = sorted(set(r[1] for r in kp_rows))
+    for pidx in person_indices:
+        frames = [r[0] for r in kp_rows if r[1] == pidx]
+        confs = [r[3] for r in kp_rows if r[1] == pidx]
+        color = PERSON_COLORS[pidx] if pidx < len(PERSON_COLORS) else DEFAULT_COLOR
+        ax.scatter(frames, confs, s=1, alpha=0.5, color=color, label=f'P{pidx}')
     ax.set_ylabel(name)
     ax.set_ylim(-0.05, 1.05)
 
-    # 閾値線
+    # 閾値線（全閾値を凡例に表示）
     if thresholds:
         for th in thresholds:
-            ax.axhline(y=th, color='r', linestyle='--', alpha=0.5, label=f'{th}')
-        ax.legend(loc='lower right', fontsize=8)
+            ax.axhline(y=th, color='r', linestyle='--', alpha=0.5, label=f'thr={th}')
+
+    ax.legend(loc='lower right', fontsize=8, markerscale=5)
 
 axes[-1].set_xlabel('Frame')
 fig.suptitle('Keypoint Confidence Timeline')
@@ -184,6 +198,9 @@ plt.close(fig)
 
 - **採用**: 散布図（scatter） — 同一フレームに複数人物の点が重なるため、散布図が適切
 - **却下**: 折れ線グラフ — 人物の追跡をしないため、線で繋ぐ意味がない
+- **色分け**: 人物インデックス（フレーム内の順番）で色分け。matplotlibデフォルトカラーサイクル（C0=青, C1=オレンジ, C2=緑, C3=赤, C4=紫）を使用し、5人目まで区別可能。6人目以降はグレーにまとめる。単一人物のみのケースでは凡例に`P0`のみ表示される（想定通り）
+- **凡例**: `markerscale=5`でドットサイズを拡大し、凡例内で色が視認できるようにする。閾値線は `thr=` プレフィックスで人物凡例と区別し、全閾値を凡例に表示する
+- **プロットのコード例**: 設計書のコード例は意図の伝達が目的。実装時にリスト内包表記のフルスキャンをdict事前分類等で最適化してよい
 
 ### 4.5 境界条件
 

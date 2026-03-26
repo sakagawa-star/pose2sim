@@ -197,7 +197,7 @@ export MAMBA_EXE='/home/sakagawa/.micromamba/bin/micromamba' && export MAMBA_ROO
 
 `/clear`や新規セッション開始時は、まず `docs/accuracy_improvement_plan.md` を読んで現在の進捗を把握すること。
 
-## 現在進行中の案件（2026-03-13）
+## 現在進行中の案件（2026-03-26）
 
 | 管理番号 | 状態 | 実装するスクリプト | 次のアクション |
 |---------|------|-------------------|--------------|
@@ -205,6 +205,8 @@ export MAMBA_EXE='/home/sakagawa/.micromamba/bin/micromamba' && export MAMBA_ROO
 | 012 | **Phase 1完了・調査停止中** | `keypoint_jitter_analyze.py`（実装済み） | 動画確認後にPhase 2着手判断 |
 | 013 | **Phase 1実装待ち** | `head_keypoint_analyze.py` | `requirements.md`と`design.md`を読んで実装 |
 | 014 | **機能設計書作成待ち** | `pose_extract_person.py` | 機能設計書を作成→実装 |
+| 016 | **完了** | `pose_overlay_video.py`（実装済み） | — |
+| 017 | **完了** | `confidence_timeline.py`（実装済み） | — |
 
 ### 014: 主要人物抽出CLIツール（pose_extract_person）
 
