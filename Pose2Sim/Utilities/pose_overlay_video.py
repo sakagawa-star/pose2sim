@@ -7,12 +7,13 @@
     ## 2D KEYPOINT OVERLAY VIDEO GENERATOR          ##
     ##################################################
 
-    Generate a video with 2D keypoints and skeleton overlaid on a background image
-    (or black background) from OpenPose-format JSON files.
+    Generate a video with 2D keypoints and skeleton overlaid on a background image,
+    video, or black background from OpenPose-format JSON files.
 
     Usage:
         pose_overlay_video -j /path/to/json_dir
         pose_overlay_video -j /path/to/json_dir -b /path/to/background.jpg
+        pose_overlay_video -j /path/to/json_dir -b /path/to/video.mp4
         pose_overlay_video -j /path/to/json_dir -b bg.jpg -o output.mp4 --fps 30 --size 1920x1080
 '''
 
@@ -35,23 +36,25 @@ from Pose2Sim.skeletons import HALPE_26
 ## CONSTANTS
 
 N_KEYPOINTS = 26
+VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv'}
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp'}
 
 
 ## FUNCTIONS
 
 def process(json_dir, background_path, output_path, fps, size, conf_threshold=0.0):
-    '''Generate overlay video from JSON keypoints and background image.
+    '''Generate overlay video from JSON keypoints and background image or video.
 
     Parameters
     ----------
     json_dir : str
         Path to directory containing per-frame JSON files.
     background_path : str or None
-        Path to background image. None for black background.
+        Path to background image or video. None for black background.
     output_path : str
         Path to output MP4 video.
-    fps : int
-        Frame rate of output video.
+    fps : int or None
+        Frame rate of output video. None for auto (from video, or 30).
     size : tuple[int, int]
         (width, height) of the video. Ignored when background_path is provided.
     conf_threshold : float
@@ -64,19 +67,67 @@ def process(json_dir, background_path, output_path, fps, size, conf_threshold=0.
 
     n_frames = len(files)
 
-    # Prepare background image
+    # Prepare background
+    bg = None
+    bg_cap = None
+
     if background_path is not None:
-        bg = cv2.imread(background_path)
-        if bg is None:
-            raise FileNotFoundError(f'Cannot read background image: {background_path}')
+        ext = os.path.splitext(background_path)[1].lower()
+        if ext in VIDEO_EXTENSIONS:
+            bg_cap = cv2.VideoCapture(background_path)
+            if not bg_cap.isOpened():
+                raise FileNotFoundError(f'Cannot open background video: {background_path}')
+            bg_mode = 'video'
+        elif ext in IMAGE_EXTENSIONS:
+            bg = cv2.imread(background_path)
+            if bg is None:
+                raise FileNotFoundError(f'Cannot read background image: {background_path}')
+            bg_mode = 'image'
+        else:
+            bg = cv2.imread(background_path)
+            if bg is not None:
+                bg_mode = 'image'
+            else:
+                bg_cap = cv2.VideoCapture(background_path)
+                if bg_cap.isOpened():
+                    bg_mode = 'video'
+                else:
+                    raise FileNotFoundError(f'Cannot read background file: {background_path}')
     else:
+        bg_mode = 'black'
         W, H = size
         bg = np.zeros((H, W, 3), dtype=np.uint8)
 
-    H, W = bg.shape[:2]
+    # Get resolution, FPS, and frame count
+    if bg_mode == 'video':
+        W = int(bg_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        H = int(bg_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        if fps is None:
+            video_fps = bg_cap.get(cv2.CAP_PROP_FPS)
+            fps = int(round(video_fps)) if video_fps > 0 else 30
+    elif bg_mode == 'image':
+        H, W = bg.shape[:2]
+        if fps is None:
+            fps = 30
+    else:  # black
+        if fps is None:
+            fps = 30
+
+    # Determine render frame count
+    if bg_mode == 'video':
+        n_video_frames = int(bg_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        n_render = min(n_frames, n_video_frames)
+        if n_frames != n_video_frames:
+            print(f'Warning: JSON files ({n_frames}) and video frames ({n_video_frames}) count mismatch. '
+                  f'Rendering {n_render} frames.', file=sys.stderr)
+    else:
+        n_render = n_frames
 
     print(f'JSON files: {n_frames}')
-    print(f'Background: {W}x{H} ({"image" if background_path else "black"})')
+    if bg_mode == 'video':
+        print(f'Background: {W}x{H} (video: {background_path})')
+    else:
+        print(f'Background: {W}x{H} ({"image" if bg_mode == "image" else "black"})')
     print(f'Output: {output_path}')
     print(f'FPS: {fps}')
     if conf_threshold > 0.0:
@@ -91,8 +142,14 @@ def process(json_dir, background_path, output_path, fps, size, conf_threshold=0.
     n_empty = 0
     t_start = time.time()
 
-    for frame_idx, f in enumerate(tqdm(files, desc='Rendering')):
-        img = bg.copy()
+    for frame_idx, f in enumerate(tqdm(files[:n_render], desc='Rendering')):
+        # Get background frame
+        if bg_mode == 'video':
+            ret, img = bg_cap.read()
+            if not ret:
+                break
+        else:
+            img = bg.copy()
 
         # Frame number
         cv2.putText(img, f'Frame: {frame_idx}', (10, 30),
@@ -133,11 +190,13 @@ def process(json_dir, background_path, output_path, fps, size, conf_threshold=0.
 
         out.write(img)
 
+    if bg_cap is not None:
+        bg_cap.release()
     out.release()
 
     elapsed = time.time() - t_start
-    print(f'Done. {n_frames} frames rendered in {elapsed:.1f}s.')
-    print(f'  Empty frames: {n_empty} ({n_empty/n_frames*100:.1f}%)')
+    print(f'Done. {n_render} frames rendered in {elapsed:.1f}s.')
+    print(f'  Empty frames: {n_empty} ({n_empty/n_render*100:.1f}%)')
     print(f'  Output: {output_path}')
 
 
@@ -148,11 +207,11 @@ def main():
     parser.add_argument('-j', '--json_dir', required=True,
                         help='Input JSON directory')
     parser.add_argument('-b', '--background', default=None,
-                        help='Background image path (default: black background)')
+                        help='Background image or video path (default: black background)')
     parser.add_argument('-o', '--output', default=None,
                         help='Output video path (default: {json_dir}_overlay.mp4)')
-    parser.add_argument('-f', '--fps', type=int, default=30,
-                        help='Frame rate (default: 30)')
+    parser.add_argument('-f', '--fps', type=int, default=None,
+                        help='Frame rate (default: auto from video, or 30)')
     parser.add_argument('-s', '--size', default='1920x1080',
                         help='Image size WxH (default: 1920x1080). Ignored when -b is specified.')
     parser.add_argument('-c', '--conf_threshold', type=float, default=0.0,

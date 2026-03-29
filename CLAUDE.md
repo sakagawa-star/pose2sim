@@ -208,7 +208,7 @@ export MAMBA_EXE='/home/sakagawa/.micromamba/bin/micromamba' && export MAMBA_ROO
 | 016 | **完了** | `pose_overlay_video.py`（実装済み） | — |
 | 017 | **完了** | `confidence_timeline.py`（実装済み） | — |
 | 018 | **完了** | `pose_overlay_video.py`（confidence閾値フィルタ追加） | — |
-| 019 | **要求仕様書・機能設計書作成待ち** | `pose_overlay_video.py`（MP4動画背景対応） | 要求仕様書・機能設計書を作成→実装 |
+| 019 | **完了** | `pose_overlay_video.py`（MP4動画背景対応） | — |
 
 ### 014: 主要人物抽出CLIツール（pose_extract_person）
 
