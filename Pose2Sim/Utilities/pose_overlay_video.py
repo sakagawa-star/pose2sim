@@ -39,7 +39,7 @@ N_KEYPOINTS = 26
 
 ## FUNCTIONS
 
-def process(json_dir, background_path, output_path, fps, size):
+def process(json_dir, background_path, output_path, fps, size, conf_threshold=0.0):
     '''Generate overlay video from JSON keypoints and background image.
 
     Parameters
@@ -54,6 +54,8 @@ def process(json_dir, background_path, output_path, fps, size):
         Frame rate of output video.
     size : tuple[int, int]
         (width, height) of the video. Ignored when background_path is provided.
+    conf_threshold : float
+        Confidence threshold. Keypoints with confidence < this value are hidden.
     '''
     # List JSON files
     files = sorted(glob(os.path.join(json_dir, '*.json')))
@@ -77,6 +79,8 @@ def process(json_dir, background_path, output_path, fps, size):
     print(f'Background: {W}x{H} ({"image" if background_path else "black"})')
     print(f'Output: {output_path}')
     print(f'FPS: {fps}')
+    if conf_threshold > 0.0:
+        print(f'Confidence threshold: {conf_threshold}')
 
     # Set up video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -112,7 +116,7 @@ def process(json_dir, background_path, output_path, fps, size):
             if len(kps) < N_KEYPOINTS * 3:
                 continue
             kp = np.array(kps[:N_KEYPOINTS * 3]).reshape(N_KEYPOINTS, 3)
-            mask = kp[:, 2] <= 0
+            mask = (kp[:, 2] <= 0) | (kp[:, 2] < conf_threshold)
             kp[mask, :2] = np.nan
             X_list.append(kp[:, 0])
             Y_list.append(kp[:, 1])
@@ -151,6 +155,8 @@ def main():
                         help='Frame rate (default: 30)')
     parser.add_argument('-s', '--size', default='1920x1080',
                         help='Image size WxH (default: 1920x1080). Ignored when -b is specified.')
+    parser.add_argument('-c', '--conf_threshold', type=float, default=0.0,
+                        help='Confidence threshold (default: 0.0). Keypoints below this value are hidden.')
     args = parser.parse_args()
 
     json_dir = args.json_dir
@@ -173,7 +179,7 @@ def main():
         print(f'Error: Invalid size format: {args.size}. Use WxH (e.g., 1920x1080)', file=sys.stderr)
         sys.exit(1)
 
-    process(json_dir, args.background, output_path, args.fps, size)
+    process(json_dir, args.background, output_path, args.fps, size, args.conf_threshold)
 
 
 if __name__ == '__main__':
